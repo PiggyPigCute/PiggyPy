@@ -74,6 +74,9 @@ class unit():
         self = self+other
         return self
     
+    def __neg__(self):
+        return unit(self.si, -self.val)
+
     def __sub__(self, other):
         if not isinstance(other, unit):raise(TypeError("unsupported operand type(s) for -: 'unit' and " + repr(type(other).__name__)))
         assert self.si == other.si
@@ -196,9 +199,12 @@ T_ = unit([0,1,-2,-1,0,0,0])
 pi__ = π__
 c__ = unit([1,0,-1,0,0,0,0], 299792458)
 g__ = unit([1,0,-2,0,0,0,0], 9.80665)
-ε0__ = unit([-3,-1,4,2,0,0,0], 8.85418782e12)
+ε0__ = unit([-3,-1,4,2,0,0,0], 8.85418782e-12)
 h__ = unit([2,1,-1,0,0,0,0], 6.62607015e-34)
 e__ = unit([0,0,1,1,0,0,0], 1.602176634e-19)
-µ0__ = unit([1,1,-2,-2,0,0,0], π__*4e-7)
+µ0__ = unit([1,1,-2,-2,0,0,0], 12.566370614e-7)
+me__ = unit([0,1,0,0,0,0,0], 9.109e-31)
+mp__ = unit([0,1,0,0,0,0,0], 1.67262e-27)
+mn__ = unit([0,1,0,0,0,0,0], 1.675e-27)
 
 
