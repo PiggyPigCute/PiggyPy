@@ -60,8 +60,6 @@ class linmap:
     dim = property(get_dim)
     size = property(get_size)
 
-from PyLibs.debug import *
-
 def mat(obj:linspace|linmap|tuple[int|float,...]|tuple[tuple[int|float,...],...], *bases:tuple[tuple[int|float,...],...]) -> Matrix:
     """Return the matrix form of a linear object
     
