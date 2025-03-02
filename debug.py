@@ -1,7 +1,16 @@
 
 from numpy import ndarray as _numpy_array
 
+global DEBUG_OUTPUT
+DEBUG_OUTPUT = True
+
+def debug_switch():
+    global DEBUG_OUTPUT
+    DEBUG_OUTPUT = not DEBUG_OUTPUT
+
 def debug_print(instance, name = "Debug", first_prefix = "", second_prefix = "", root = None, visited = None, line = 0, equality = " = "):
+    if not DEBUG_OUTPUT:
+        return
     if visited == None:
         visited = []
     if instance is None:
@@ -61,10 +70,12 @@ class DebugCount:
         self.value = zero
         self.zero = zero
         self.name = name
-        print(' '+name, zero, "(init)")
+        if DEBUG_OUTPUT:
+            print(' '+name, zero, "(init)")
     
     def get(self):
-        print(' '+self.name, self.value)
+        if DEBUG_OUTPUT:
+            print(' '+self.name, self.value)
         return self.value
 
     def __call__(self, add:int|float|bool = 1):
@@ -82,14 +93,13 @@ class DebugCount:
     i = property(__call__, set)
 
 
-
-def debug(*values, name = "Debug", separator = ' ', prefix = ' ', repr=True):
+def debug(*values, name = "Debug", separator = ' ', prefix = ' ', repr=True, end='\n'):
+    if not DEBUG_OUTPUT:
+        return
     print(prefix+name, end=' ')
     for val in values:
         if repr:
             print(val.__repr__(), end=separator)
         else:
             print(val, end=separator)
-    print()
-
-
+    print(end=end)
