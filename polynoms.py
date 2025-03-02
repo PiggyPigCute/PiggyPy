@@ -13,8 +13,10 @@ class poly:
     def __repr__(self) -> str:
         return "poly(" + ','.join(str(i) for i in self.coeff) + ")"
 
-    def __getitem__(self, i:int|slice):
-        return (0 if i >= len(self) else self.coeff[i]) if isinstance(i, int) else self.coeff[i.start:min(len(self),0 if i.stop==None else i.stop)]+(i.stop==None or i.stop>=len(self))*([0 for i in range((len(self) if i.stop==None else i.stop)-max(len(self),i.start))])
+    def __getitem__(self, i:int):
+        if i >= len(self):
+            return 0
+        return self.coeff[i]
     
     def __setitem__(self, i, coeff):
         while i >= len(self): self.coeff.append(0)
@@ -22,23 +24,37 @@ class poly:
         return self
     
     def __len__(self) -> int:
-        while self.coeff[-1] == 0: self.coeff.pop()
+        while len(self.coeff)>0 and self.coeff[-1] == 0: self.coeff.pop()
         return len(self.coeff)
     
     def __add__(self, other):
-        return poly([self[i]+other[i] for i in range(max(len(self),len(other)))]) if isinstance(other,poly) else poly([self[0]+other]+self[1:len(self)]) # type: ignore
+        return poly([self[i]+other[i] for i in range(max(len(self),len(other)))]) if isinstance(other,poly) else self + poly(other)
     
     def __iadd__(self, other):
-        self.coeff = [self[i]+other[i] for i in range(len(self))]
+        self = self+other
+        return self
 
     def __radd__(self, other):
         return self+other
+    
+    def __neg__(self):
+        return poly([-self[i] for i in range(len(self))])
+    
+    def __sub__(self, other):
+        return self + (-other)
+    
+    def __isub__(self, other):
+        self = self-other
+        return self
+
+    def __rsub__(self, other):
+        return (-self)+other
 
     def __mul__(self, other):
         return poly([sum([self[k]*other[i-k] for k in range(i+1)]) for i in range(max(len(self), len(other))+1)]) if isinstance(other, poly) else poly([other*coeff for coeff in self.coeff])
     
     def __imul__(self, other):
-        self.coeff = (self*other).coeff
+        self = self*other
     
     def __rmul__(self, other):
         return self*other
@@ -47,13 +63,19 @@ class poly:
         return (poly(1),self.copy,self*self)[other] if other<=2 else (self**((other-1)//2))**2*((other%2==0) + (other%2!=0)*self)
     
     def __eq__(self, other) -> bool:
-        return self.coeff == other.coeff
+        while len(self.coeff)>0 and self.coeff[-1] == 0: self.coeff.pop()
+        if isinstance(other,poly):
+            while len(other.coeff)>0 and other.coeff[-1] == 0: other.coeff.pop()
+            return self.coeff == other.coeff
+        else:
+            return self.coeff == [other]
     
     def __neq__(self, other) -> bool:
         return not self == other
 
     def get_deg(self) -> int|float:
-        return len(self)-1 if len(self)>0 else float('-inf')
+        l = len(self)
+        return l-1 if l>0 else float('-inf')
     
     def get_max(self):
         return self[self.deg]
