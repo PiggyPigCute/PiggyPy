@@ -128,13 +128,16 @@ class unit():
         assert isinstance(other, unit)
         assert self.si == other.si
         return self.val/other.val
-	
-    
-    
-def unit_print(value:unit, unit:unit, symb="", name=None, *args, **kwargs):
+
+
+def unit_print(value:unit, unit:unit|float, symb="", name=None, cut=-1, **kwargs):
+    x = value/unit
+    if cut >= 0:
+        assert type(x) == float
+        x = round(x*10**cut)/(10**cut)
     if name != None:
         print(name + " = ", end="")
-    print(value/unit, symb, **kwargs)
+    print(x, symb, **kwargs)
 
 def dim(unit:unit):
     return unit.dim
