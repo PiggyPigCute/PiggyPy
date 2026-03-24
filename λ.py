@@ -6,11 +6,17 @@ class λ_expr:
     def __mul__(self,other):
         return λ_app(self,other)
     
+    def __add__(self,other):
+        return other
+    
     def __eq__(self, value) -> bool:
         return False
     
     def __bool__(self) -> bool:
-        return self.β_normal_form() == (λ_var('x')+(λ_var('y')+λ_var('x')))
+        return self.β_normal_form() == λT
+    
+    def __len__(self) -> int:
+        return 0
 
     def free_vars(self) -> set[str]:
         return set()
@@ -44,7 +50,7 @@ class λ_expr:
     def β_contractions(self) -> list:
         return []
     
-    def β_reductions(self, limit:int=20, exclusions=[]) -> list:
+    def β_reductions(self, limit:int=30, exclusions=[]) -> list:
         if len(exclusions)>limit-1:
             return []
         conts = self.β_contractions()
@@ -62,7 +68,7 @@ class λ_expr:
     def is_normal_form(self) -> bool:
         return True
     
-    def β_normal_form(self,limit=20):
+    def β_normal_form(self,limit=30):
         for red in self.β_reductions(limit):
             if red.is_normal_form():
                 return red
@@ -83,6 +89,9 @@ class λ_var(λ_expr):
     
     def __add__(self, other:λ_expr) -> λ_expr:
         return λ_abs(self.name, other)
+    
+    def __len__(self) -> int:
+        return 1
     
     def free_vars(self) -> set[str]:
         return set([self.name])
@@ -108,14 +117,11 @@ class λ_app(λ_expr):
         self.t = t
     
     def __str__(self) -> str:
-        if isinstance(self.s,λ_abs):
-            str_s = "("+str(self.s)+")"
-        else:
-            str_s = str(self.s)
-        if isinstance(self.t,λ_var):
-            str_t = str(self.t)
-        else:
-            str_t = "("+str(self.t)+")"
+        str_s, str_t = str(self.s), str(self.t)
+        if isinstance(self.s, λ_abs) and len(str_s)>1:
+            str_s = '('+str_s+')'
+        if len(str_t)>1:
+            str_t = '('+str_t+')'
         return str_s + str_t
 
     def __repr__(self) -> str:
@@ -123,6 +129,9 @@ class λ_app(λ_expr):
     
     def __eq__(self, other:λ_expr) -> bool:
         return isinstance(other, λ_app) and self.s == other.s and self.t == other.t
+    
+    def __len__(self) -> int:
+        return len(self.s) + len(self.t)
     
     def free_vars(self) -> set[str]:
         return self.s.free_vars().union(self.t.free_vars())
@@ -158,6 +167,22 @@ class λ_abs(λ_expr):
         self.expr = expression
     
     def __str__(self) -> str:
+        if self.var=='a' and isinstance(self.expr,λ_abs) and self.expr.var=='b' and isinstance(self.expr.expr,λ_var):
+            if self.expr.expr.name == 'a': return "T"
+            if self.expr.expr.name == 'b': return "⊥"
+        if self.var=='f' and isinstance(self.expr,λ_abs) and self.expr.var=='x':
+            always_f = True
+            expr = self.expr.expr
+            i = 0
+            while isinstance(expr,λ_app):
+                if isinstance(expr.s,λ_var) and expr.s.name == 'f':
+                    expr = expr.t
+                    i += 1
+                else:
+                    always_f = False
+                    break
+            if always_f and isinstance(expr,λ_var) and expr.name == 'x':
+                return str(i)
         return "λ" + str(self.var) + "." + str(self.expr)
     
     def __repr__(self) -> str:
@@ -165,6 +190,12 @@ class λ_abs(λ_expr):
     
     def __eq__(self, other:λ_expr) -> bool:
         return isinstance(other, λ_abs) and self.expr == other.expr.sub(other.var,λ_var(self.var))
+    
+    def __add__(self, other:λ_expr) -> λ_expr:
+        return λ_abs(self.var, self.expr + other)
+    
+    def __len__(self) -> int:
+        return len(self.expr) + 1
 
     def free_vars(self) -> set[str]:
         return self.expr.free_vars().difference(set([self.var]))
@@ -190,17 +221,21 @@ class λ_abs(λ_expr):
     def is_normal_form(self) -> bool:
         return self.expr.is_normal_form()
 
-class LambaExpressionError(Exception):
+class LambdaExpressionParserError(Exception):
     def __init__(self, missing_element, text) -> None:
         super().__init__(missing_element+" is missing in the expression "+repr(text))
 
-def λ(text:str) -> λ_expr:
+class LambdaExpressionConversionError(Exception):
+    def __init__(self, obj_type) -> None:
+        super().__init__("impossible to convert "+obj_type+" into λ-expression")
+
+def λ_parser(text:str) -> λ_expr:
     text = text.replace(" ","")
     if len(text)==1:
         return λ_var(text)
     if text[0] in "λl":
         if len(text)<3 or text[2]!=".":
-            raise LambaExpressionError("Dot", text)
+            raise LambdaExpressionParserError("Dot", text)
         return λ_abs(text[1],λ(text[3:]))
     else:
         if text[-1] == ")":
@@ -209,7 +244,7 @@ def λ(text:str) -> λ_expr:
             while b>0:
                 i -= 1
                 if i<0:
-                    raise LambaExpressionError("Open bracket", text)
+                    raise LambdaExpressionParserError("Open bracket", text)
                 if text[i] == ')':
                     b += 1
                 if text[i] == '(':
@@ -220,7 +255,28 @@ def λ(text:str) -> λ_expr:
             i = len(text)-1
         return λ_app(λ(text[:i]),λ(text[i:]))
 
-def print_β_tree(expr:λ_expr, exprs_stores:list[λ_expr]=[], firt_prefix:str="  ", prefix:str="  ", max_length=20) -> None:
+def λ(obj:λ_expr|bool|int|str|tuple) -> λ_expr:
+    if isinstance(obj, λ_expr):
+        return obj
+    elif isinstance(obj, bool):
+        return λT if obj else λF
+    elif isinstance(obj, int):
+        expr = λx
+        for _ in range(obj):
+            expr = λf*expr
+        return λf+λx+expr
+    elif isinstance(obj, tuple):
+        if len(obj) != 2:
+            raise LambdaExpressionConversionError("tuple with a length not equal to 2")
+        s,t = λ(obj[0]), λ(obj[1])
+        ττ = λ_var("ττ")
+        return ττ+ττ*s*t
+    elif isinstance(obj, str):
+        return λ_parser(obj)
+    else:
+        raise LambdaExpressionConversionError(obj.__class__.__name__)
+
+def print_β_tree(expr:λ_expr, exprs_stores:list[λ_expr]=[], firt_prefix:str="  ", prefix:str="  ", max_length=30) -> None:
     i = len(exprs_stores)
     print(" "*(i%100<10)+str(i%100)+firt_prefix,end="")
     if i==max_length:
@@ -239,7 +295,7 @@ def print_β_tree(expr:λ_expr, exprs_stores:list[λ_expr]=[], firt_prefix:str="
         else:
             print_β_tree(conts[j], exprs_stores, prefix+"└─ ", prefix+"   ")
 
-def print_β_reductions(expr:λ_expr, limit:int=20):
+def print_β_reductions(expr:λ_expr, limit:int=30):
     reds = expr.β_reductions(limit)
     normal_forms = []
     other_forms = []
@@ -262,3 +318,14 @@ def print_β_reductions(expr:λ_expr, limit:int=20):
     def plot_list(n,m,l):
         return ("─"*n if size<24 else "─"*(size-m))+"┤\n"+"\n".join(["│ "+plot_value(red)+" │" for red in l])+"\n"*(len(l)>0)
     print(color+"┌─ Original λ-expression "+"─"*(size-22)+"┐\n│ "+plot_value(expr)+" │\n├─"+"─────"*(size<24)+" Normal form "+plot_list(6,12,normal_forms)+"├─"+"──"*(size<24)+" Other β-reducions "+plot_list(3,18,other_forms)+"└"+"─"*(size+2)+"┘"+zero)
+
+def β(expr:λ_expr, limit=30) -> λ_expr|None:
+    return expr.β_normal_form(limit)
+
+λa = λ_var('a')
+λb = λ_var('b')
+λf = λ_var('f')
+λx = λ_var('x')
+
+λT = λa+λb+λa
+λF = λa+λb+λb
